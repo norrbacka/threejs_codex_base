@@ -1,4 +1,4 @@
 import { PLAYER_COLORS } from "./types";
 
 export const BOARD_SIZE = 8;
-export const TURN_ORDER = [...PLAYER_COLORS];
+export const TURN_ORDER = Object.freeze([...PLAYER_COLORS]);
