@@ -116,7 +116,7 @@ export function createBoardView() {
     }
   }
 
-  function pulseInvalidMove() {
+  function pulseInvalidMove(onRestore?: () => void) {
     if (invalidPulseTimeout !== null) {
       window.clearTimeout(invalidPulseTimeout);
     }
@@ -127,6 +127,7 @@ export function createBoardView() {
       cursorMaterial.color.set("#fff27a");
       cursorMaterial.emissive.set("#ffcc33");
       invalidPulseTimeout = null;
+      onRestore?.();
     }, 120);
   }
 

@@ -27,7 +27,9 @@ export function createUltrathelloApp(host: HTMLElement) {
     },
     onConfirm: () => {
       if (!analyzeMove(state, cursor)) {
-        boardView.pulseInvalidMove?.();
+        boardView.pulseInvalidMove?.(() => {
+          renderer.renderer.render(renderer.scene, renderer.camera);
+        });
         renderer.renderer.render(renderer.scene, renderer.camera);
         return;
       }
