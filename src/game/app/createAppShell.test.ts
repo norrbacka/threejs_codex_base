@@ -13,4 +13,12 @@ describe("createAppShell", () => {
     expect(root.lastElementChild).toBe(shell.hudRoot);
     expect(root.children).toHaveLength(2);
   });
+
+  it("marks the root element as a full-height app shell", () => {
+    const root = document.createElement("div");
+
+    createAppShell(root);
+
+    expect(root.classList.contains("app-shell")).toBe(true);
+  });
 });

@@ -5,6 +5,7 @@ export type AppShell = {
 
 export function createAppShell(root: HTMLElement): AppShell {
   root.replaceChildren();
+  root.classList.add("app-shell");
 
   const canvasHost = document.createElement("div");
   canvasHost.className = "canvas-host";
