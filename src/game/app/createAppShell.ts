@@ -8,11 +8,9 @@ export function createAppShell(root: HTMLElement): AppShell {
 
   const canvasHost = document.createElement("div");
   canvasHost.className = "canvas-host";
-  canvasHost.dataset.role = "canvas-host";
 
   const hudRoot = document.createElement("div");
   hudRoot.className = "hud-root";
-  hudRoot.dataset.role = "hud-root";
 
   root.append(canvasHost, hudRoot);
 

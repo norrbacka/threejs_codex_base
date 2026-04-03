@@ -6,8 +6,11 @@ describe("createAppShell", () => {
     const root = document.createElement("div");
     const shell = createAppShell(root);
 
-    expect(shell.canvasHost.dataset.role).toBe("canvas-host");
-    expect(shell.hudRoot.dataset.role).toBe("hud-root");
+    expect(shell.canvasHost.className).toBe("canvas-host");
+    expect(shell.hudRoot.className).toBe("hud-root");
+    expect(shell.canvasHost).not.toBe(shell.hudRoot);
+    expect(root.firstElementChild).toBe(shell.canvasHost);
+    expect(root.lastElementChild).toBe(shell.hudRoot);
     expect(root.children).toHaveLength(2);
   });
 });
