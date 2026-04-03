@@ -9,4 +9,10 @@ if (!root) {
 }
 
 const shell = createAppShell(root);
-createUltrathelloApp(shell.canvasHost);
+const app = createUltrathelloApp(shell.canvasHost);
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    app.dispose();
+  });
+}

@@ -1,0 +1,43 @@
+import { Mesh, MeshStandardMaterial } from "three";
+import { describe, expect, it } from "vitest";
+import type { BoardCell, GameState } from "../core/types";
+import { createBoardView } from "./boardView";
+
+function createState(board: BoardCell[][]): GameState {
+  return {
+    board,
+    currentPlayer: "black",
+    consecutivePasses: 0,
+    lastMove: null
+  };
+}
+
+describe("createBoardView", () => {
+  it("maps board state to piece visibility and material colors", () => {
+    const board = Array.from({ length: 8 }, () => Array<BoardCell>(8).fill(null));
+    board[0][0] = "black";
+    board[0][1] = "white";
+    board[0][2] = "red";
+    board[0][3] = "blue";
+
+    const view = createBoardView();
+    view.renderState(createState(board));
+
+    const blackPiece = view.group.getObjectByName("piece-0-0") as Mesh;
+    const whitePiece = view.group.getObjectByName("piece-0-1") as Mesh;
+    const redPiece = view.group.getObjectByName("piece-0-2") as Mesh;
+    const bluePiece = view.group.getObjectByName("piece-0-3") as Mesh;
+    const emptyPiece = view.group.getObjectByName("piece-7-7") as Mesh;
+
+    expect(blackPiece.visible).toBe(true);
+    expect(whitePiece.visible).toBe(true);
+    expect(redPiece.visible).toBe(true);
+    expect(bluePiece.visible).toBe(true);
+    expect(emptyPiece.visible).toBe(false);
+
+    expect((blackPiece.material as MeshStandardMaterial).color.getHexString()).toBe("1f2430");
+    expect((whitePiece.material as MeshStandardMaterial).color.getHexString()).toBe("f6f7fb");
+    expect((redPiece.material as MeshStandardMaterial).color.getHexString()).toBe("f04b4b");
+    expect((bluePiece.material as MeshStandardMaterial).color.getHexString()).toBe("4f7cff");
+  });
+});

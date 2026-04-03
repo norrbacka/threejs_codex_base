@@ -7,10 +7,6 @@ import {
   WebGLRenderer
 } from "three";
 
-declare global {
-  interface GPUTexture {}
-}
-
 export function createSceneRenderer(host: HTMLElement) {
   const scene = new Scene();
   scene.background = new Color("#070b14");
@@ -29,15 +25,35 @@ export function createSceneRenderer(host: HTMLElement) {
   keyLight.position.set(4, 10, 6);
   scene.add(keyLight);
 
+  let disposed = false;
+
   function resize() {
+    if (disposed) {
+      return;
+    }
+
     const { clientWidth, clientHeight } = host;
-    renderer.setSize(clientWidth, clientHeight, false);
-    camera.aspect = clientWidth / clientHeight;
+    const width = Math.max(clientWidth, 1);
+    const height = Math.max(clientHeight, 1);
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
+  }
+
+  function dispose() {
+    if (disposed) {
+      return;
+    }
+
+    disposed = true;
+    window.removeEventListener("resize", resize);
+    renderer.dispose();
+    renderer.forceContextLoss();
+    renderer.domElement.remove();
   }
 
   resize();
   window.addEventListener("resize", resize);
 
-  return { scene, camera, renderer, resize };
+  return { scene, camera, renderer, resize, dispose };
 }

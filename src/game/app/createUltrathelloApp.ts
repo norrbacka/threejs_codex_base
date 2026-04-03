@@ -9,4 +9,11 @@ export function createUltrathelloApp(host: HTMLElement) {
   renderer.scene.add(boardView.group);
   boardView.renderState(state);
   renderer.renderer.render(renderer.scene, renderer.camera);
+
+  function dispose() {
+    boardView.dispose();
+    renderer.dispose();
+  }
+
+  return { dispose };
 }

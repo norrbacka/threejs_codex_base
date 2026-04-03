@@ -3,6 +3,7 @@ import {
   Color,
   CylinderGeometry,
   Group,
+  Material,
   Mesh,
   MeshStandardMaterial
 } from "three";
@@ -63,5 +64,41 @@ export function createBoardView() {
     }
   }
 
-  return { group, renderState };
+  function disposeMaterial(material: Material | Material[]) {
+    if (Array.isArray(material)) {
+      for (const entry of material) {
+        entry.dispose();
+      }
+
+      return;
+    }
+
+    material.dispose();
+  }
+
+  function dispose() {
+    const disposedGeometries = new Set();
+    const disposedMaterials = new Set();
+
+    group.traverse((child) => {
+      if (!(child instanceof Mesh)) {
+        return;
+      }
+
+      if (!disposedGeometries.has(child.geometry)) {
+        child.geometry.dispose();
+        disposedGeometries.add(child.geometry);
+      }
+
+      if (!disposedMaterials.has(child.material)) {
+        disposeMaterial(child.material);
+        disposedMaterials.add(child.material);
+      }
+    });
+
+    group.removeFromParent();
+    group.clear();
+  }
+
+  return { group, renderState, dispose };
 }
