@@ -5,9 +5,10 @@ import {
   Group,
   Material,
   Mesh,
-  MeshStandardMaterial
+  MeshStandardMaterial,
+  RingGeometry
 } from "three";
-import type { GameState, PlayerColor } from "../core/types";
+import type { BoardCoord, GameState, PlayerColor } from "../core/types";
 import { buildBoardLayout } from "./buildBoardLayout";
 
 const playerColors: Record<PlayerColor, string> = {
@@ -29,6 +30,15 @@ export function createBoardView() {
   const tileGeometry = new BoxGeometry(0.94, 0.08, 0.94);
   const pieceGeometry = new CylinderGeometry(0.34, 0.42, 0.26, 24);
   const layout = buildBoardLayout();
+  const cursorMaterial = new MeshStandardMaterial({ color: "#fff27a", emissive: "#ffcc33" });
+  const cursor = new Mesh(new RingGeometry(0.38, 0.47, 32), cursorMaterial);
+  const markers = new Group();
+  let invalidPulseTimeout: number | null = null;
+
+  cursor.rotation.x = -Math.PI / 2;
+  cursor.position.y = 0.06;
+  group.add(cursor);
+  group.add(markers);
 
   for (const tile of layout.tiles) {
     const tileMesh = new Mesh(
@@ -50,6 +60,10 @@ export function createBoardView() {
     group.add(piece);
   }
 
+  function getTilePosition(coord: BoardCoord) {
+    return layout.tiles.find((entry) => entry.row === coord.row && entry.col === coord.col);
+  }
+
   function renderState(state: GameState) {
     for (const tile of layout.tiles) {
       const piece = group.getObjectByName(`piece-${tile.row}-${tile.col}`) as Mesh;
@@ -62,6 +76,58 @@ export function createBoardView() {
         material.emissive = new Color(playerColors[cell]).multiplyScalar(0.12);
       }
     }
+  }
+
+  function updateCursor(coord: BoardCoord) {
+    const tile = getTilePosition(coord);
+    if (!tile) return;
+
+    cursor.position.set(tile.x, 0.06, tile.z);
+  }
+
+  function disposeMarker(marker: Mesh) {
+    marker.geometry.dispose();
+    disposeMaterial(marker.material);
+  }
+
+  function clearMarkers() {
+    for (const child of [...markers.children]) {
+      markers.remove(child);
+
+      if (child instanceof Mesh) {
+        disposeMarker(child);
+      }
+    }
+  }
+
+  function updateLegalMoves(moves: BoardCoord[]) {
+    clearMarkers();
+
+    for (const move of moves) {
+      const tile = getTilePosition(move);
+      if (!tile) continue;
+
+      const marker = new Mesh(
+        new CylinderGeometry(0.12, 0.12, 0.04, 16),
+        new MeshStandardMaterial({ color: "#6ef3ff", emissive: "#1bc7ff" })
+      );
+      marker.position.set(tile.x, 0.08, tile.z);
+      markers.add(marker);
+    }
+  }
+
+  function pulseInvalidMove() {
+    if (invalidPulseTimeout !== null) {
+      window.clearTimeout(invalidPulseTimeout);
+    }
+
+    cursorMaterial.color.set("#ff6b87");
+    cursorMaterial.emissive.set("#ff3355");
+    invalidPulseTimeout = window.setTimeout(() => {
+      cursorMaterial.color.set("#fff27a");
+      cursorMaterial.emissive.set("#ffcc33");
+      invalidPulseTimeout = null;
+    }, 120);
   }
 
   function disposeMaterial(material: Material | Material[]) {
@@ -77,6 +143,11 @@ export function createBoardView() {
   }
 
   function dispose() {
+    if (invalidPulseTimeout !== null) {
+      window.clearTimeout(invalidPulseTimeout);
+    }
+
+    clearMarkers();
     const disposedGeometries = new Set();
     const disposedMaterials = new Set();
 
@@ -100,5 +171,5 @@ export function createBoardView() {
     group.clear();
   }
 
-  return { group, renderState, dispose };
+  return { group, renderState, updateCursor, updateLegalMoves, pulseInvalidMove, dispose };
 }
