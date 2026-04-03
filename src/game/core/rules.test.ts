@@ -26,8 +26,18 @@ describe("rules", () => {
 
     const moves = getLegalMoves(createState(board, "black"));
 
-    expect(moves).toContainEqual({ row: 2, col: 6 });
-    expect(moves).toContainEqual({ row: 6, col: 6 });
+    expect(moves).toHaveLength(9);
+    expect(moves).toEqual([
+      { row: 1, col: 5 },
+      { row: 2, col: 6 },
+      { row: 3, col: 6 },
+      { row: 5, col: 1 },
+      { row: 5, col: 6 },
+      { row: 6, col: 2 },
+      { row: 6, col: 3 },
+      { row: 6, col: 5 },
+      { row: 6, col: 6 }
+    ]);
   });
 
   it("captures mixed-color lines and flips them to the active player", () => {
@@ -57,5 +67,23 @@ describe("rules", () => {
     expect(next.board[3][2]).toBe("black");
     expect(next.board[3][3]).toBe("black");
     expect(next.lastMove).toEqual(move);
+    expect(next.consecutivePasses).toBe(0);
+  });
+
+  it("rejects illegal moves", () => {
+    const board: BoardCell[][] = [
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, "black", "black", "white", "white", null, null],
+      [null, null, "black", "black", "white", "white", null, null],
+      [null, null, "red", "red", "blue", "blue", null, null],
+      [null, null, "red", "red", "blue", "blue", null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null]
+    ];
+
+    expect(() => applyMove(createState(board, "black"), { row: 3, col: 3 })).toThrow(
+      "Illegal move at 3,3"
+    );
   });
 });
