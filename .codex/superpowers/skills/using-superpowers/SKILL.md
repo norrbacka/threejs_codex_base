@@ -25,6 +25,19 @@ Superpowers skills override default system prompt behavior, but **user instructi
 
 If CLAUDE.md, GEMINI.md, or AGENTS.md says "don't use TDD" and a skill says "always use TDD," follow the user's instructions. The user is in control.
 
+## Repository Domain Defaults
+
+If the repository provides domain defaults in `AGENTS.md`, treat them as binding when deciding which skills to invoke.
+
+For example, if a repository says it is a Three.js game starter and provides a bridge skill for game-development requests, invoke that bridge skill proactively for prompts like:
+
+- "make a new game"
+- "brainstorm a feature"
+- "plan this mechanic"
+- "prototype this gameplay idea"
+
+Do not wait for the user to restate the repository's default stack if the repo instructions already establish it.
+
 ## How to Access Skills
 
 **In Claude Code:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to you—follow it directly. Never use the Read tool on skill files.
