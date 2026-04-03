@@ -19,7 +19,7 @@ export function createUltrathelloApp(host: HTMLElement) {
     renderer.renderer.render(renderer.scene, renderer.camera);
   }
 
-  const detachKeyboard = attachKeyboardController({
+  const detachKeyboard = attachKeyboardController(host, {
     getCursor: () => cursor,
     onCursorChange: (next) => {
       cursor = next;

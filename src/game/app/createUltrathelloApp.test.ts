@@ -112,7 +112,7 @@ describe("createUltrathelloApp", () => {
         }
       | undefined;
 
-    mocks.attachKeyboardController.mockImplementation((handlers) => {
+    mocks.attachKeyboardController.mockImplementation((_, handlers) => {
       keyboardHandlers = handlers;
       return vi.fn();
     });

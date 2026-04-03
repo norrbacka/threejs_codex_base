@@ -7,9 +7,39 @@ export type KeyboardHandlers = {
   onConfirm: () => void;
 };
 
-export function attachKeyboardController(handlers: KeyboardHandlers) {
+const MOVEMENT_KEYS = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "KeyW",
+  "KeyA",
+  "KeyS",
+  "KeyD"
+]);
+
+const CONFIRM_KEYS = new Set(["Space", "Enter"]);
+
+export function attachKeyboardController(host: HTMLElement, handlers: KeyboardHandlers) {
+  if (host.tabIndex < 0) {
+    host.tabIndex = 0;
+  }
+
+  function focusHost() {
+    host.focus();
+  }
+
+  focusHost();
+
   function onKeyDown(event: KeyboardEvent) {
-    if (event.code === "Space" || event.code === "Enter") {
+    const ownsKey = MOVEMENT_KEYS.has(event.code) || CONFIRM_KEYS.has(event.code);
+    if (!ownsKey || document.activeElement !== host) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (CONFIRM_KEYS.has(event.code)) {
       event.preventDefault();
       handlers.onConfirm();
       return;
@@ -19,11 +49,15 @@ export function attachKeyboardController(handlers: KeyboardHandlers) {
     const next = moveCursor(current, event.code);
 
     if (next.row !== current.row || next.col !== current.col) {
-      event.preventDefault();
       handlers.onCursorChange(next);
     }
   }
 
-  window.addEventListener("keydown", onKeyDown);
-  return () => window.removeEventListener("keydown", onKeyDown);
+  host.addEventListener("keydown", onKeyDown);
+  host.addEventListener("pointerdown", focusHost);
+
+  return () => {
+    host.removeEventListener("keydown", onKeyDown);
+    host.removeEventListener("pointerdown", focusHost);
+  };
 }
