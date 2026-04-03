@@ -14,3 +14,8 @@ export type GameState = {
   consecutivePasses: number;
   lastMove: BoardCoord | null;
 };
+
+export type MoveAnalysis = {
+  move: BoardCoord;
+  captured: BoardCoord[];
+};
