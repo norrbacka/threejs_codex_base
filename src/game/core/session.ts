@@ -1,5 +1,6 @@
 import { TURN_ORDER } from "./constants";
 import { getLegalMoves } from "./rules";
+import { PLAYER_COLORS } from "./types";
 import type { BoardCell, GameState, PlayerColor } from "./types";
 
 export type Scoreboard = Record<PlayerColor, number>;
@@ -9,14 +10,18 @@ export type GameResult = {
   scores: Scoreboard;
 };
 
+function createEmptyScoreboard(): Scoreboard {
+  return PLAYER_COLORS.reduce<Scoreboard>((scores, player) => {
+    scores[player] = 0;
+    return scores;
+  }, {} as Scoreboard);
+}
+
 export function buildScoreboard(board: BoardCell[][]): Scoreboard {
-  return board.flat().reduce<Scoreboard>(
-    (scores, cell) => {
-      if (cell) scores[cell] += 1;
-      return scores;
-    },
-    { black: 0, white: 0, red: 0, blue: 0 }
-  );
+  return board.flat().reduce<Scoreboard>((scores, cell) => {
+    if (cell) scores[cell] += 1;
+    return scores;
+  }, createEmptyScoreboard());
 }
 
 function nextPlayer(current: PlayerColor): PlayerColor {
@@ -29,10 +34,11 @@ function boardIsFull(board: BoardCell[][]): boolean {
 }
 
 export function advanceToNextTurn(state: GameState): GameState {
+  const passLimit = TURN_ORDER.length;
   let currentPlayer = nextPlayer(state.currentPlayer);
   let consecutivePasses = state.consecutivePasses;
 
-  for (let checked = 0; checked < TURN_ORDER.length; checked += 1) {
+  for (let checked = 0; checked < passLimit; checked += 1) {
     const candidate = { ...state, currentPlayer };
 
     if (getLegalMoves(candidate).length > 0) {
@@ -43,11 +49,13 @@ export function advanceToNextTurn(state: GameState): GameState {
     currentPlayer = nextPlayer(currentPlayer);
   }
 
-  return { ...state, currentPlayer, consecutivePasses: 4 };
+  return { ...state, currentPlayer, consecutivePasses: passLimit };
 }
 
 export function getGameResult(state: GameState): GameResult | null {
-  if (!boardIsFull(state.board) && state.consecutivePasses < 4) return null;
+  const passLimit = TURN_ORDER.length;
+
+  if (!boardIsFull(state.board) && state.consecutivePasses < passLimit) return null;
 
   const scores = buildScoreboard(state.board);
   const top = Math.max(...Object.values(scores));
