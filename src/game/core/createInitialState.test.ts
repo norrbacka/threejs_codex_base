@@ -5,16 +5,24 @@ import { createInitialState } from "./createInitialState";
 describe("createInitialState", () => {
   it("creates an 8x8 board with the 4x4 quadrant opening", () => {
     const state = createInitialState();
+    const expectedBoard = [
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, "black", "black", "white", "white", null, null],
+      [null, null, "black", "black", "white", "white", null, null],
+      [null, null, "red", "red", "blue", "blue", null, null],
+      [null, null, "red", "red", "blue", "blue", null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null]
+    ];
 
     expect(BOARD_SIZE).toBe(8);
     expect(state.board).toHaveLength(BOARD_SIZE);
     expect(state.board[0]).toHaveLength(BOARD_SIZE);
     expect(state.currentPlayer).toBe("black");
+    expect(state.consecutivePasses).toBe(0);
+    expect(state.lastMove).toBeNull();
     expect(TURN_ORDER).toEqual(["black", "white", "red", "blue"]);
-
-    expect(state.board[2][2]).toBe("black");
-    expect(state.board[2][5]).toBe("white");
-    expect(state.board[5][2]).toBe("red");
-    expect(state.board[5][5]).toBe("blue");
+    expect(state.board).toEqual(expectedBoard);
   });
 });
