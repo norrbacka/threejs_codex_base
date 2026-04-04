@@ -8,7 +8,7 @@ import {
   MeshStandardMaterial,
   RingGeometry
 } from "three";
-import type { BoardCoord, GameState, PlayerColor } from "../core/types";
+import type { BoardCell, BoardCoord, GameState, PlayerColor } from "../core/types";
 import { buildBoardLayout } from "./buildBoardLayout";
 
 const playerColors: Record<PlayerColor, string> = {
@@ -35,6 +35,7 @@ export function createBoardView() {
   const markers = new Group();
   let invalidPulseTimeout: number | null = null;
   let placedPulseTimeout: number | null = null;
+  const flipPulseTimeouts = new Map<string, number>();
 
   cursor.rotation.x = -Math.PI / 2;
   cursor.position.y = 0.06;
@@ -65,10 +66,12 @@ export function createBoardView() {
     return layout.tiles.find((entry) => entry.row === coord.row && entry.col === coord.col);
   }
 
-  function renderState(state: GameState) {
+  function renderState(state: GameState, boardOverride?: BoardCell[][]) {
+    const renderedBoard = boardOverride ?? state.board;
+
     for (const tile of layout.tiles) {
       const piece = group.getObjectByName(`piece-${tile.row}-${tile.col}`) as Mesh;
-      const cell = state.board[tile.row][tile.col];
+      const cell = renderedBoard[tile.row][tile.col];
       piece.visible = cell !== null;
 
       if (cell) {
@@ -132,7 +135,7 @@ export function createBoardView() {
     }, 120);
   }
 
-  function pulsePlacedPiece(coord: BoardCoord) {
+  function pulsePlacedPiece(coord: BoardCoord, onRestore?: () => void) {
     const piece = group.getObjectByName(`piece-${coord.row}-${coord.col}`) as Mesh | undefined;
     if (!piece) return;
 
@@ -144,14 +147,42 @@ export function createBoardView() {
     placedPulseTimeout = window.setTimeout(() => {
       piece.scale.setScalar(1);
       placedPulseTimeout = null;
+      onRestore?.();
     }, 110);
   }
 
-  function flashFlip(coord: BoardCoord) {
+  function flashFlip(coord: BoardCoord, onRestore?: () => void) {
     const piece = group.getObjectByName(`piece-${coord.row}-${coord.col}`) as Mesh | undefined;
     if (!piece) return;
 
-    piece.rotation.y += Math.PI;
+    const key = `${coord.row}-${coord.col}`;
+    const existingTimeout = flipPulseTimeouts.get(key);
+    if (existingTimeout !== undefined) {
+      window.clearTimeout(existingTimeout);
+      flipPulseTimeouts.delete(key);
+    }
+
+    const material = piece.material as MeshStandardMaterial;
+    const originalPositionY = piece.position.y;
+    const originalRotationX = piece.rotation.x;
+    const originalScale = piece.scale.clone();
+    const originalEmissive = material.emissive.clone();
+
+    piece.scale.set(0.22, 1.28, 1.18);
+    piece.rotation.x = Math.PI * 0.45;
+    piece.position.y = originalPositionY + 0.15;
+    material.emissive = originalEmissive.clone().lerp(new Color("#ffffff"), 0.55);
+
+    const timeout = window.setTimeout(() => {
+      piece.scale.copy(originalScale);
+      piece.rotation.x = originalRotationX;
+      piece.position.y = originalPositionY;
+      material.emissive.copy(originalEmissive);
+      flipPulseTimeouts.delete(key);
+      onRestore?.();
+    }, 140);
+
+    flipPulseTimeouts.set(key, timeout);
   }
 
   function disposeMaterial(material: Material | Material[]) {
@@ -174,6 +205,11 @@ export function createBoardView() {
     if (placedPulseTimeout !== null) {
       window.clearTimeout(placedPulseTimeout);
     }
+
+    for (const timeout of flipPulseTimeouts.values()) {
+      window.clearTimeout(timeout);
+    }
+    flipPulseTimeouts.clear();
 
     clearMarkers();
     const disposedGeometries = new Set();

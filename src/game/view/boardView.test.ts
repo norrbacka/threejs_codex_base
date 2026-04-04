@@ -63,6 +63,19 @@ describe("createBoardView", () => {
     expect(markers.children).toHaveLength(0);
   });
 
+  it("can render from a transient board override", () => {
+    const board = Array.from({ length: 8 }, () => Array<BoardCell>(8).fill(null));
+    board[3][3] = "black";
+    const transientBoard = board.map((row) => [...row]);
+    transientBoard[3][3] = "white";
+
+    const view = createBoardView();
+    view.renderState(createState(board), transientBoard);
+
+    const piece = view.group.getObjectByName("piece-3-3") as Mesh;
+    expect((piece.material as MeshStandardMaterial).color.getHexString()).toBe("f6f7fb");
+  });
+
   it("restores the cursor pulse and invokes the restore callback", () => {
     vi.useFakeTimers();
 
@@ -82,6 +95,34 @@ describe("createBoardView", () => {
 
     expect(material.color.getHexString()).toBe("fff27a");
     expect(material.emissive.getHexString()).toBe("ffcc33");
+    expect(onRestore).toHaveBeenCalledTimes(1);
+  });
+
+  it("animates a visible flip pulse and restores the piece transform", () => {
+    vi.useFakeTimers();
+
+    const board = Array.from({ length: 8 }, () => Array<BoardCell>(8).fill(null));
+    board[3][3] = "black";
+    const view = createBoardView();
+    view.renderState(createState(board));
+
+    const piece = view.group.getObjectByName("piece-3-3") as Mesh;
+    const material = piece.material as MeshStandardMaterial;
+    const originalPositionY = piece.position.y;
+    const onRestore = vi.fn();
+
+    view.flashFlip({ row: 3, col: 3 }, onRestore);
+
+    expect(piece.scale.x).toBeLessThan(1);
+    expect(piece.scale.y).toBeGreaterThan(1);
+    expect(piece.position.y).toBeGreaterThan(originalPositionY);
+    expect(material.emissive.getHexString()).not.toBe("030405");
+
+    vi.advanceTimersByTime(140);
+
+    expect(piece.scale.x).toBe(1);
+    expect(piece.scale.y).toBe(1);
+    expect(piece.position.y).toBe(originalPositionY);
     expect(onRestore).toHaveBeenCalledTimes(1);
   });
 });

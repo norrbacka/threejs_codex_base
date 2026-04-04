@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   updateCursor: vi.fn(),
   updateLegalMoves: vi.fn(),
   pulseInvalidMove: vi.fn(),
+  pulsePlacedPiece: vi.fn(),
+  flashFlip: vi.fn(),
   disposeBoardView: vi.fn(),
   renderFrame: vi.fn(),
   disposeRenderer: vi.fn(),
@@ -16,7 +18,9 @@ const mocks = vi.hoisted(() => ({
   analyzeMove: vi.fn(),
   applyMove: vi.fn(),
   getLegalMoves: vi.fn(),
-  advanceToNextTurn: vi.fn()
+  advanceToNextTurn: vi.fn(),
+  buildMoveTimeline: vi.fn(),
+  playTimeline: vi.fn()
 }));
 
 vi.mock("../core/createInitialState", () => ({
@@ -37,6 +41,14 @@ vi.mock("../core/session", () => ({
   advanceToNextTurn: mocks.advanceToNextTurn
 }));
 
+vi.mock("../animation/buildMoveTimeline", () => ({
+  buildMoveTimeline: mocks.buildMoveTimeline
+}));
+
+vi.mock("../animation/moveAnimator", () => ({
+  playTimeline: mocks.playTimeline
+}));
+
 vi.mock("../view/boardView", () => ({
   createBoardView: vi.fn(() => ({
     group: new Group(),
@@ -44,6 +56,8 @@ vi.mock("../view/boardView", () => ({
     updateCursor: mocks.updateCursor,
     updateLegalMoves: mocks.updateLegalMoves,
     pulseInvalidMove: mocks.pulseInvalidMove,
+    pulsePlacedPiece: mocks.pulsePlacedPiece,
+    flashFlip: mocks.flashFlip,
     dispose: mocks.disposeBoardView
   }))
 }));
@@ -63,6 +77,8 @@ describe("createUltrathelloApp", () => {
     mocks.updateCursor.mockReset();
     mocks.updateLegalMoves.mockReset();
     mocks.pulseInvalidMove.mockReset();
+    mocks.pulsePlacedPiece.mockReset();
+    mocks.flashFlip.mockReset();
     mocks.disposeBoardView.mockReset();
     mocks.renderFrame.mockReset();
     mocks.disposeRenderer.mockReset();
@@ -73,6 +89,8 @@ describe("createUltrathelloApp", () => {
     mocks.applyMove.mockReset();
     mocks.getLegalMoves.mockReset();
     mocks.advanceToNextTurn.mockReset();
+    mocks.buildMoveTimeline.mockReset();
+    mocks.playTimeline.mockReset();
 
     mocks.createInitialState.mockReturnValue({
       board: Array.from({ length: 8 }, () => Array(8).fill(null)),
@@ -85,6 +103,8 @@ describe("createUltrathelloApp", () => {
     mocks.pulseInvalidMove.mockImplementation((onRestore?: () => void) => {
       onRestore?.();
     });
+    mocks.buildMoveTimeline.mockReturnValue([]);
+    mocks.playTimeline.mockResolvedValue(undefined);
   });
 
   it("renders the initial board and disposes owned resources", () => {
@@ -93,7 +113,10 @@ describe("createUltrathelloApp", () => {
     const app = createUltrathelloApp(host);
 
     expect(mocks.sceneAdd).toHaveBeenCalledTimes(1);
-    expect(mocks.renderState).toHaveBeenCalledWith(mocks.createInitialState.mock.results[0]?.value);
+    expect(mocks.renderState).toHaveBeenCalledWith(
+      mocks.createInitialState.mock.results[0]?.value,
+      undefined
+    );
     expect(mocks.renderFrame).toHaveBeenCalledTimes(1);
 
     app.dispose();
@@ -123,5 +146,78 @@ describe("createUltrathelloApp", () => {
 
     expect(mocks.pulseInvalidMove).toHaveBeenCalledTimes(1);
     expect(mocks.renderFrame).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps captured pieces on their previous owner until the flip step runs", async () => {
+    const host = document.createElement("div");
+    const initialBoard = Array.from({ length: 8 }, () => Array(8).fill(null));
+    initialBoard[3][3] = "white";
+    const initialState = {
+      board: initialBoard,
+      currentPlayer: "black",
+      consecutivePasses: 0,
+      lastMove: null
+    };
+    const appliedBoard = initialBoard.map((row) => [...row]);
+    appliedBoard[3][4] = "black";
+    appliedBoard[3][3] = "black";
+    const appliedState = {
+      ...initialState,
+      board: appliedBoard,
+      lastMove: { row: 3, col: 4 }
+    };
+
+    let keyboardHandlers:
+      | {
+          getCursor: () => { row: number; col: number };
+          onCursorChange: (next: { row: number; col: number }) => void;
+          onConfirm: () => Promise<void>;
+        }
+      | undefined;
+    let finishTimeline: (() => void) | undefined;
+
+    mocks.createInitialState.mockReturnValue(initialState);
+    mocks.attachKeyboardController.mockImplementation((_, handlers) => {
+      keyboardHandlers = handlers;
+      return vi.fn();
+    });
+    mocks.analyzeMove.mockReturnValue({
+      move: { row: 3, col: 4 },
+      captured: [{ row: 3, col: 3 }]
+    });
+    mocks.applyMove.mockReturnValue(appliedState);
+    mocks.advanceToNextTurn.mockImplementation((state) => state);
+    mocks.buildMoveTimeline.mockReturnValue([
+      { kind: "place", at: 0 },
+      { kind: "flip", at: 90, coord: { row: 3, col: 3 } }
+    ]);
+    mocks.playTimeline.mockImplementation(
+      async (
+        steps: { kind: "place" | "flip"; coord?: { row: number; col: number } }[],
+        runStep: (step: { kind: "place" | "flip"; coord?: { row: number; col: number } }) => void
+      ) =>
+        new Promise<void>((resolve) => {
+          runStep(steps[0]);
+          finishTimeline = () => {
+            runStep(steps[1]);
+            resolve();
+          };
+        })
+    );
+
+    createUltrathelloApp(host);
+    keyboardHandlers?.onCursorChange({ row: 3, col: 4 });
+
+    const pendingConfirm = keyboardHandlers?.onConfirm();
+    expect(pendingConfirm).toBeDefined();
+
+    const stagedRender = mocks.renderState.mock.calls.find((call) => call[1] !== undefined);
+    const stagedBoard = stagedRender?.[1] as string[][];
+    expect(stagedRender?.[0]).toBe(appliedState);
+    expect(stagedBoard[3][4]).toBe("black");
+    expect(stagedBoard[3][3]).toBe("white");
+
+    finishTimeline?.();
+    await pendingConfirm;
   });
 });
