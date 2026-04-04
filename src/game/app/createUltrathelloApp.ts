@@ -1,22 +1,50 @@
 import { buildMoveTimeline } from "../animation/buildMoveTimeline";
 import { playTimeline } from "../animation/moveAnimator";
+import { TURN_ORDER } from "../core/constants";
 import { createInitialState } from "../core/createInitialState";
 import { advanceToNextTurn } from "../core/session";
 import { analyzeMove, applyMove, getLegalMoves } from "../core/rules";
-import type { BoardCell } from "../core/types";
+import type { BoardCell, GameState, PlayerColor } from "../core/types";
 import { attachKeyboardController } from "../input/keyboardController";
 import { createBoardView } from "../view/boardView";
 import { createSceneRenderer } from "../view/createSceneRenderer";
+import { deriveHudState, type HudTurnNotice } from "../ui/deriveHudState";
+import { createHudView } from "../ui/hudView";
 
-export function createUltrathelloApp(host: HTMLElement) {
+function nextPlayer(color: PlayerColor): PlayerColor {
+  const index = TURN_ORDER.indexOf(color);
+  return TURN_ORDER[(index + 1) % TURN_ORDER.length];
+}
+
+function collectSkippedPlayers(state: GameState, nextActivePlayer: PlayerColor) {
+  const skipped: PlayerColor[] = [];
+  let candidate = nextPlayer(state.currentPlayer);
+
+  while (candidate !== nextActivePlayer) {
+    const candidateState = { ...state, currentPlayer: candidate };
+
+    if (getLegalMoves(candidateState).length > 0) {
+      break;
+    }
+
+    skipped.push(candidate);
+    candidate = nextPlayer(candidate);
+  }
+
+  return skipped;
+}
+
+export function createUltrathelloApp(host: HTMLElement, hudHost = document.createElement("div")) {
   let state = createInitialState();
   let cursor = { row: 2, col: 6 };
   let inputLocked = false;
   let displayBoard: BoardCell[][] | undefined;
+  let turnNotice: HudTurnNotice | undefined;
   let disposed = false;
   let animationId = 0;
   const renderer = createSceneRenderer(host);
   const boardView = createBoardView();
+  const hudView = createHudView(hudHost);
   renderer.scene.add(boardView.group);
 
   function render() {
@@ -25,6 +53,7 @@ export function createUltrathelloApp(host: HTMLElement) {
     boardView.renderState(state, displayBoard);
     boardView.updateCursor?.(cursor);
     boardView.updateLegalMoves?.(inputLocked ? [] : getLegalMoves(state));
+    hudView.render(deriveHudState(state, turnNotice));
     renderer.renderer.render(renderer.scene, renderer.camera);
   }
 
@@ -93,7 +122,10 @@ export function createUltrathelloApp(host: HTMLElement) {
       }
 
       displayBoard = undefined;
-      state = advanceToNextTurn(state);
+      const nextState = advanceToNextTurn(state);
+      const skippedPlayers = collectSkippedPlayers(state, nextState.currentPlayer);
+      turnNotice = skippedPlayers.length > 0 ? { skippedPlayers } : undefined;
+      state = nextState;
       inputLocked = false;
       render();
     }
@@ -106,7 +138,9 @@ export function createUltrathelloApp(host: HTMLElement) {
     animationId += 1;
     inputLocked = false;
     displayBoard = undefined;
+    turnNotice = undefined;
     detachKeyboard();
+    hudView.dispose();
     boardView.dispose();
     renderer.dispose();
   }

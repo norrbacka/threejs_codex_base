@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   applyMove: vi.fn(),
   getLegalMoves: vi.fn(),
   advanceToNextTurn: vi.fn(),
+  getGameResult: vi.fn(),
+  buildScoreboard: vi.fn(),
   buildMoveTimeline: vi.fn(),
   playTimeline: vi.fn()
 }));
@@ -38,7 +40,9 @@ vi.mock("../core/rules", () => ({
 }));
 
 vi.mock("../core/session", () => ({
-  advanceToNextTurn: mocks.advanceToNextTurn
+  advanceToNextTurn: mocks.advanceToNextTurn,
+  getGameResult: mocks.getGameResult,
+  buildScoreboard: mocks.buildScoreboard
 }));
 
 vi.mock("../animation/buildMoveTimeline", () => ({
@@ -89,6 +93,8 @@ describe("createUltrathelloApp", () => {
     mocks.applyMove.mockReset();
     mocks.getLegalMoves.mockReset();
     mocks.advanceToNextTurn.mockReset();
+    mocks.getGameResult.mockReset();
+    mocks.buildScoreboard.mockReset();
     mocks.buildMoveTimeline.mockReset();
     mocks.playTimeline.mockReset();
 
@@ -100,6 +106,19 @@ describe("createUltrathelloApp", () => {
     });
     mocks.attachKeyboardController.mockReturnValue(vi.fn());
     mocks.getLegalMoves.mockReturnValue([]);
+    mocks.getGameResult.mockReturnValue(null);
+    mocks.buildScoreboard.mockImplementation((board: string[][]) =>
+      board.flat().reduce(
+        (scores, cell) => {
+          if (cell === "black" || cell === "white" || cell === "red" || cell === "blue") {
+            scores[cell] += 1;
+          }
+
+          return scores;
+        },
+        { black: 0, white: 0, red: 0, blue: 0 }
+      )
+    );
     mocks.pulseInvalidMove.mockImplementation((onRestore?: () => void) => {
       onRestore?.();
     });
