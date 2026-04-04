@@ -34,6 +34,7 @@ export function createBoardView() {
   const cursor = new Mesh(new RingGeometry(0.38, 0.47, 32), cursorMaterial);
   const markers = new Group();
   let invalidPulseTimeout: number | null = null;
+  let placedPulseTimeout: number | null = null;
 
   cursor.rotation.x = -Math.PI / 2;
   cursor.position.y = 0.06;
@@ -131,6 +132,28 @@ export function createBoardView() {
     }, 120);
   }
 
+  function pulsePlacedPiece(coord: BoardCoord) {
+    const piece = group.getObjectByName(`piece-${coord.row}-${coord.col}`) as Mesh | undefined;
+    if (!piece) return;
+
+    if (placedPulseTimeout !== null) {
+      window.clearTimeout(placedPulseTimeout);
+    }
+
+    piece.scale.setScalar(1.18);
+    placedPulseTimeout = window.setTimeout(() => {
+      piece.scale.setScalar(1);
+      placedPulseTimeout = null;
+    }, 110);
+  }
+
+  function flashFlip(coord: BoardCoord) {
+    const piece = group.getObjectByName(`piece-${coord.row}-${coord.col}`) as Mesh | undefined;
+    if (!piece) return;
+
+    piece.rotation.y += Math.PI;
+  }
+
   function disposeMaterial(material: Material | Material[]) {
     if (Array.isArray(material)) {
       for (const entry of material) {
@@ -146,6 +169,10 @@ export function createBoardView() {
   function dispose() {
     if (invalidPulseTimeout !== null) {
       window.clearTimeout(invalidPulseTimeout);
+    }
+
+    if (placedPulseTimeout !== null) {
+      window.clearTimeout(placedPulseTimeout);
     }
 
     clearMarkers();
@@ -172,5 +199,14 @@ export function createBoardView() {
     group.clear();
   }
 
-  return { group, renderState, updateCursor, updateLegalMoves, pulseInvalidMove, dispose };
+  return {
+    group,
+    renderState,
+    updateCursor,
+    updateLegalMoves,
+    pulseInvalidMove,
+    pulsePlacedPiece,
+    flashFlip,
+    dispose
+  };
 }
