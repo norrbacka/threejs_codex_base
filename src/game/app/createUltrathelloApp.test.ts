@@ -366,4 +366,35 @@ describe("createUltrathelloApp", () => {
     expect(mocks.pulsePlacedPiece).not.toHaveBeenCalled();
     expect(mocks.flashFlip).not.toHaveBeenCalled();
   });
+
+  it("ignores cursor movement and confirm once the game is over", () => {
+    const host = document.createElement("div");
+    let keyboardHandlers:
+      | {
+          getCursor: () => { row: number; col: number };
+          onCursorChange: (next: { row: number; col: number }) => void;
+          onConfirm: () => Promise<void>;
+        }
+      | undefined;
+
+    mocks.attachKeyboardController.mockImplementation((_, handlers) => {
+      keyboardHandlers = handlers;
+      return vi.fn();
+    });
+    mocks.getGameResult.mockReturnValue({
+      winners: ["black"],
+      scores: { black: 4, white: 2, red: 1, blue: 1 }
+    });
+
+    createUltrathelloApp(host);
+
+    const renderCountBeforeInput = mocks.updateCursor.mock.calls.length;
+    keyboardHandlers?.onCursorChange({ row: 0, col: 0 });
+    void keyboardHandlers?.onConfirm();
+
+    expect(mocks.updateCursor).toHaveBeenCalledTimes(renderCountBeforeInput);
+    expect(mocks.analyzeMove).not.toHaveBeenCalled();
+    expect(mocks.applyMove).not.toHaveBeenCalled();
+    expect(mocks.playTimeline).not.toHaveBeenCalled();
+  });
 });

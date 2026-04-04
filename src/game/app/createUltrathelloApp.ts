@@ -2,7 +2,7 @@ import { buildMoveTimeline } from "../animation/buildMoveTimeline";
 import { playTimeline } from "../animation/moveAnimator";
 import { TURN_ORDER } from "../core/constants";
 import { createInitialState } from "../core/createInitialState";
-import { advanceToNextTurn } from "../core/session";
+import { advanceToNextTurn, getGameResult } from "../core/session";
 import { analyzeMove, applyMove, getLegalMoves } from "../core/rules";
 import type { BoardCell, GameState, PlayerColor } from "../core/types";
 import { attachKeyboardController } from "../input/keyboardController";
@@ -63,16 +63,20 @@ export function createUltrathelloApp(host: HTMLElement, hudHost = document.creat
     renderer.renderer.render(renderer.scene, renderer.camera);
   }
 
+  function isGameOver() {
+    return getGameResult(state) !== null;
+  }
+
   const detachKeyboard = attachKeyboardController(host, {
     getCursor: () => cursor,
     onCursorChange: (next) => {
-      if (inputLocked) return;
+      if (inputLocked || isGameOver()) return;
 
       cursor = next;
       render();
     },
     onConfirm: async () => {
-      if (inputLocked) return;
+      if (inputLocked || isGameOver()) return;
 
       const analysis = analyzeMove(state, cursor);
       if (!analysis) {
