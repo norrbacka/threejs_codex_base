@@ -13,14 +13,24 @@ export function createUltrathelloApp(host: HTMLElement) {
   let cursor = { row: 2, col: 6 };
   let inputLocked = false;
   let displayBoard: BoardCell[][] | undefined;
+  let disposed = false;
+  let animationId = 0;
   const renderer = createSceneRenderer(host);
   const boardView = createBoardView();
   renderer.scene.add(boardView.group);
 
   function render() {
+    if (disposed) return;
+
     boardView.renderState(state, displayBoard);
     boardView.updateCursor?.(cursor);
-    boardView.updateLegalMoves?.(getLegalMoves(state));
+    boardView.updateLegalMoves?.(inputLocked ? [] : getLegalMoves(state));
+    renderer.renderer.render(renderer.scene, renderer.camera);
+  }
+
+  function renderFrame() {
+    if (disposed) return;
+
     renderer.renderer.render(renderer.scene, renderer.camera);
   }
 
@@ -38,24 +48,28 @@ export function createUltrathelloApp(host: HTMLElement) {
       const analysis = analyzeMove(state, cursor);
       if (!analysis) {
         boardView.pulseInvalidMove?.(() => {
-          renderer.renderer.render(renderer.scene, renderer.camera);
+          renderFrame();
         });
-        renderer.renderer.render(renderer.scene, renderer.camera);
+        renderFrame();
         return;
       }
 
       const player = state.currentPlayer;
       const stagedBoard = state.board.map((row) => [...row]);
       stagedBoard[cursor.row][cursor.col] = player;
+      const currentAnimationId = ++animationId;
+      const isAnimationActive = () => !disposed && currentAnimationId === animationId;
       inputLocked = true;
       state = applyMove(state, cursor);
       displayBoard = stagedBoard;
       render();
 
       await playTimeline(buildMoveTimeline(analysis), (step) => {
+        if (!isAnimationActive()) return;
+
         if (step.kind === "place") {
           boardView.pulsePlacedPiece?.(cursor, () => {
-            renderer.renderer.render(renderer.scene, renderer.camera);
+            renderFrame();
           });
         }
 
@@ -67,12 +81,16 @@ export function createUltrathelloApp(host: HTMLElement) {
           }
 
           boardView.flashFlip?.(step.coord, () => {
-            renderer.renderer.render(renderer.scene, renderer.camera);
+            renderFrame();
           });
         }
 
-        renderer.renderer.render(renderer.scene, renderer.camera);
-      });
+        renderFrame();
+      }, () => !isAnimationActive());
+
+      if (!isAnimationActive()) {
+        return;
+      }
 
       displayBoard = undefined;
       state = advanceToNextTurn(state);
@@ -84,6 +102,10 @@ export function createUltrathelloApp(host: HTMLElement) {
   render();
 
   function dispose() {
+    disposed = true;
+    animationId += 1;
+    inputLocked = false;
+    displayBoard = undefined;
     detachKeyboard();
     boardView.dispose();
     renderer.dispose();

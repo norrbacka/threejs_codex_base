@@ -220,4 +220,131 @@ describe("createUltrathelloApp", () => {
     finishTimeline?.();
     await pendingConfirm;
   });
+
+  it("keeps input locked while the animation is pending", async () => {
+    const host = document.createElement("div");
+    const initialState = {
+      board: Array.from({ length: 8 }, () => Array(8).fill(null)),
+      currentPlayer: "black",
+      consecutivePasses: 0,
+      lastMove: null
+    };
+    const appliedState = {
+      ...initialState,
+      board: initialState.board.map((row) => [...row]),
+      lastMove: { row: 2, col: 6 }
+    };
+    let keyboardHandlers:
+      | {
+          getCursor: () => { row: number; col: number };
+          onCursorChange: (next: { row: number; col: number }) => void;
+          onConfirm: () => Promise<void>;
+        }
+      | undefined;
+    let finishTimeline: (() => void) | undefined;
+
+    mocks.createInitialState.mockReturnValue(initialState);
+    mocks.attachKeyboardController.mockImplementation((_, handlers) => {
+      keyboardHandlers = handlers;
+      return vi.fn();
+    });
+    mocks.analyzeMove.mockReturnValue({
+      move: { row: 2, col: 6 },
+      captured: [{ row: 2, col: 5 }]
+    });
+    mocks.applyMove.mockReturnValue(appliedState);
+    mocks.advanceToNextTurn.mockImplementation((state) => state);
+    mocks.buildMoveTimeline.mockReturnValue([{ kind: "place", at: 0 }]);
+    mocks.playTimeline.mockImplementation(
+      async (_steps, runStep) =>
+        new Promise<void>((resolve) => {
+          runStep({ kind: "place", at: 0 });
+          finishTimeline = () => resolve();
+        })
+    );
+
+    createUltrathelloApp(host);
+
+    const pendingConfirm = keyboardHandlers?.onConfirm();
+    expect(pendingConfirm).toBeDefined();
+    expect(mocks.updateLegalMoves).toHaveBeenLastCalledWith([]);
+
+    const renderCallsBeforeLockedMove = mocks.renderState.mock.calls.length;
+    keyboardHandlers?.onCursorChange({ row: 0, col: 0 });
+    keyboardHandlers?.onConfirm();
+
+    expect(mocks.renderState).toHaveBeenCalledTimes(renderCallsBeforeLockedMove);
+    expect(mocks.playTimeline).toHaveBeenCalledTimes(1);
+
+    finishTimeline?.();
+    await pendingConfirm;
+  });
+
+  it("ignores in-flight animation callbacks after dispose", async () => {
+    const host = document.createElement("div");
+    const initialState = {
+      board: Array.from({ length: 8 }, () => Array(8).fill(null)),
+      currentPlayer: "black",
+      consecutivePasses: 0,
+      lastMove: null
+    };
+    const appliedBoard = initialState.board.map((row) => [...row]);
+    appliedBoard[2][6] = "black";
+    appliedBoard[2][5] = "black";
+    const appliedState = {
+      ...initialState,
+      board: appliedBoard,
+      lastMove: { row: 2, col: 6 }
+    };
+    let keyboardHandlers:
+      | {
+          getCursor: () => { row: number; col: number };
+          onCursorChange: (next: { row: number; col: number }) => void;
+          onConfirm: () => Promise<void>;
+        }
+      | undefined;
+    let capturedRunStep:
+      | ((step: { kind: "place" | "flip"; at: number; coord?: { row: number; col: number } }) => void)
+      | undefined;
+    let finishTimeline: (() => void) | undefined;
+
+    mocks.createInitialState.mockReturnValue(initialState);
+    mocks.attachKeyboardController.mockImplementation((_, handlers) => {
+      keyboardHandlers = handlers;
+      return vi.fn();
+    });
+    mocks.analyzeMove.mockReturnValue({
+      move: { row: 2, col: 6 },
+      captured: [{ row: 2, col: 5 }]
+    });
+    mocks.applyMove.mockReturnValue(appliedState);
+    mocks.advanceToNextTurn.mockImplementation((state) => state);
+    mocks.buildMoveTimeline.mockReturnValue([
+      { kind: "place", at: 0 },
+      { kind: "flip", at: 90, coord: { row: 2, col: 5 } }
+    ]);
+    mocks.playTimeline.mockImplementation(
+      async (_steps, runStep) =>
+        new Promise<void>((resolve) => {
+          capturedRunStep = runStep;
+          finishTimeline = resolve;
+        })
+    );
+
+    const app = createUltrathelloApp(host);
+    const pendingConfirm = keyboardHandlers?.onConfirm();
+    expect(pendingConfirm).toBeDefined();
+
+    app.dispose();
+    const renderCountAtDispose = mocks.renderFrame.mock.calls.length;
+
+    capturedRunStep?.({ kind: "place", at: 0 });
+    capturedRunStep?.({ kind: "flip", at: 90, coord: { row: 2, col: 5 } });
+    finishTimeline?.();
+    await pendingConfirm;
+
+    expect(mocks.renderFrame).toHaveBeenCalledTimes(renderCountAtDispose);
+    expect(mocks.pulsePlacedPiece).not.toHaveBeenCalled();
+    expect(mocks.flashFlip).not.toHaveBeenCalled();
+  });
 });
