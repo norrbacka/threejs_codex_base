@@ -21,6 +21,16 @@ function createEmptyBoard(): BoardCell[][] {
 }
 
 describe("createHudView", () => {
+  it("keeps the live announcement separate from the score grid", () => {
+    const root = document.createElement("div");
+
+    createHudView(root);
+
+    expect(root.querySelector(".hud-panel")?.getAttribute("aria-live")).toBeNull();
+    expect(root.querySelector(".hud-announcement")?.getAttribute("aria-live")).toBe("polite");
+    expect(root.querySelector(".hud-announcement")?.getAttribute("aria-atomic")).toBe("true");
+  });
+
   it("renders the active player, live scores, and skip notice", () => {
     const root = document.createElement("div");
     const view = createHudView(root);
@@ -46,6 +56,26 @@ describe("createHudView", () => {
       "Blue 1"
     ]);
     expect((root.querySelector(".hud-result") as HTMLElement | null)?.hidden).toBe(true);
+  });
+
+  it("keeps score nodes stable when rendering the same scores again", () => {
+    const root = document.createElement("div");
+    const view = createHudView(root);
+    const board = createEmptyBoard();
+    board[0][0] = "black";
+    board[0][1] = "white";
+
+    const hud = deriveHudState(createState(board, "black"));
+    view.render(hud);
+
+    const firstScoreNodes = Array.from(root.querySelectorAll(".hud-score"));
+
+    view.render(hud);
+
+    const secondScoreNodes = Array.from(root.querySelectorAll(".hud-score"));
+    expect(secondScoreNodes).toHaveLength(firstScoreNodes.length);
+    expect(secondScoreNodes[0]).toBe(firstScoreNodes[0]);
+    expect(secondScoreNodes[1]).toBe(firstScoreNodes[1]);
   });
 
   it("renders the final result without a turn notice", () => {
